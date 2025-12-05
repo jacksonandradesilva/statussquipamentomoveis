@@ -1,0 +1,163 @@
+/* Reset básico */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f4f7f8;
+  color: #333;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+h2 {
+  margin-bottom: 15px;
+  color: #222;
+  border-bottom: 2px solid #8B4513;
+  padding-bottom: 5px;
+}
+
+form {
+  background: white;
+  padding: 20px 25px;
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  max-width: 480px;
+  margin-bottom: 30px;
+}
+
+label {
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: block;
+  color: #444;
+}
+
+input[type="text"],
+select {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 20px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+}
+
+input[type="text"]:focus,
+select:focus {
+  border-color: #8B4513;
+  outline: none;
+}
+
+button[type="submit"] {
+  background-color: #8B4513;
+  color: white;
+  font-size: 1.1rem;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-weight: 700;
+}
+
+button[type="submit"]:hover {
+  background-color: #0056b3;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+}
+
+thead {
+  background-color: #8B4513;
+  color: white;
+}
+
+th, td {
+  padding: 15px 20px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+tbody tr:hover {
+  background-color: #f1f9ff;
+}
+
+.status-parado {
+  color: white;
+  background-color: #d9534f; /* Tom mais vibrante de vermelho */
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: center;
+  width: 90px;
+}
+
+.status-liberado {
+  color: white;
+  background-color: #5cb85c; /* Verde vibrante */
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: center;
+  width: 90px;
+}
+
+.status-standby {
+  color: white;
+  background-color: #f0ad4e; /* Amarelo dourado */
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: center;
+  width: 90px;
+}
+
+.btn {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-right: 5px;
+  color: white;
+  min-width: 70px;
+}
+
+.btn.editar {
+  background-color: #007bff; /* Azul */
+}
+
+.btn.editar:hover {
+  background-color: #0056b3;
+}
+
+.btn.excluir {
+  background-color: #dc3545; /* Vermelho */
+}
+
+.btn.excluir:hover {
+  background-color: #a71d2a;
+}
+.status-aguardandoMaterial {
+  background-color:  #FFA500;
+  color: white;
+  font-weight: bold;
+}
+.status-EquipamentoEmReforma {
+  background-color:  #FFFF00;
+  color: black;
+  font-weight: bold;
+}
+

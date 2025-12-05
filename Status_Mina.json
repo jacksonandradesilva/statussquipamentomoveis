@@ -1,0 +1,31 @@
+{
+  "equipamentos": [
+    {
+      "id": 1,
+      "nome": "Painel de Operação 1",
+      "status": "parado",
+      "causa": "Manutenção preventiva",
+      "horaInicio": "08:00",
+      "horaFim": "10:00",
+      "dataHoraCadastro": "22/01/2024, 08:00:00"
+    },
+    {
+      "id": 2,
+      "nome": "Painel de Operação 2",
+      "status": "liberado",
+      "causa": "",
+      "horaInicio": "",
+      "horaFim": "",
+      "dataHoraCadastro": "22/01/2024, 09:30:00"
+    },
+    {
+      "id": 3,
+      "nome": "Painel de Operação 3",
+      "status": "standby",
+      "causa": "Aguardando inspeção",
+      "horaInicio": "14:00",
+      "horaFim": "",
+      "dataHoraCadastro": "22/01/2024, 14:15:00"
+    }
+  ]
+}

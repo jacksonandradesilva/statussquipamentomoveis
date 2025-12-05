@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>MINA - MANUTENÇÃO OFICINA EQUIPAMENTO MOVEIS</title>
+<link rel="stylesheet" href="stile.css" />
+</head>
+<body>
+
+<h2>STATUS -EQUIPAMENTOS MOVEIS MINA</h2>
+<form id="equipamentoForm">
+  <label for="nomeEquip">PAINEL DE REGISTROS:</label>
+  <input type="text" id="nomeEquip"placeholder="Digite o Tag do equipamento (Ex: 14CR10)" required />
+  
+  <label for="statusEquip">Status:</label>
+  <select id="statusEquip" required>
+    <option value="" disabled selected>Selecione o status</option>
+    <option value="parado">Parado</option>
+    <option value="liberado">Liberado</option>
+    <option value="standby">Standby</option>
+     <option value="aguardandoMaterial">Aguardando Material</option>
+     <option value="EquipamentoEmReforma">Equipamento em Reforma</option>
+  </select>
+  
+  <label for="causaParada">EQUIPAMENTO /CAUSA:</label>
+  <input type="text" id="causaParada" placeholder="Equipamento e a causa (se aplicável)" />
+  
+  <label for="descricaoEquip">Descrição:</label>
+  <input type="text" id="descricaoEquip" placeholder="Descrição adicional do equipamento" />
+  
+  <label for="horaInicio">Horário Início:</label>
+  <input type="time" id="horaInicio" />
+  
+  <label for="horaFim">Horário Fim:</label>
+  <input type="time" id="horaFim" />
+  
+  <button type="submit">Cadastrar</button>
+  <button type="submit" id="limparBtn">Limpar</button>
+  
+</form>
+<div style="text-align-last: left; margin-bottom: 20px;">
+  <img src="stratos.png" alt="Logomarca" style="max-width: 200px; height: auto;" />
+</div>
+<h2>STATUS EQUIPAMENTOS MOVEIS</h2>
+
+<table id="relatorioEquip">
+  <thead>
+    <tr>
+      <th>Equipamento</th>
+      <th>Status</th>
+      <th>Causa da Parada</th>
+      <th>Descrição</th>
+      <th>Horário Início</th>
+      <th>Horário Fim</th>
+      <th>Data e Hora Cadastro</th>
+      <th>Ações</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- Equipamentos cadastrados aparecem aqui -->
+  </tbody>
+</table>
+
+<script>
+  const form = document.getElementById('equipamentoForm');
+  const nomeInput = document.getElementById('nomeEquip');
+  const statusSelect = document.getElementById('statusEquip');
+  const causaInput = document.getElementById('causaParada');
+  const descricaoInput = document.getElementById('descricaoEquip');
+  const horaInicioInput = document.getElementById('horaInicio');
+  const horaFimInput = document.getElementById('horaFim');
+  const tabelaCorpo = document.querySelector('#relatorioEquip tbody');
+  const limparBtn = document.getElementById('limparBtn');
+
+  // Nome da chave para salvar no localStorage
+  const STORAGE_KEY = 'Status_Mina_Data';
+  
+  let equipamentos = [];
+  let editandoIndex = null;
+  let nextId = 1;
+
+  limparBtn.addEventListener('click', () => {
+    form.reset();
+    editandoIndex = null;
+    nomeInput.focus();
+  });
+
+  // Carregar dados do localStorage
+  function carregarDados() {
+    const dadosSalvos = localStorage.getItem(STORAGE_KEY);
+    if (dadosSalvos) {
+      equipamentos = JSON.parse(dadosSalvos);
+      // Encontrar o próximo ID
+      nextId = equipamentos.length > 0 ? Math.max(...equipamentos.map(e => e.id)) + 1 : 1;
+    }
+    renderTabela();
+  }
+
+  // Salvar dados no localStorage
+  function salvarDados() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(equipamentos));
+    
+    // Também cria um JSON virtual para uso
+    criarJSONVirtual();
+  }
+
+  // Criar JSON virtual
+  function criarJSONVirtual() {
+    const dadosJSON = {
+      equipamentos: equipamentos
+    };
+    
+    console.log('Dados em formato JSON:');
+    console.log(JSON.stringify(dadosJSON, null, 2));
+    
+    return dadosJSON;
+  }
+
+  function formatDateTime(date) {
+    const options = { 
+      year: 'numeric', month: '2-digit', day: '2-digit', 
+      hour: '2-digit', minute: '2-digit', second: '2-digit' 
+    };
+    return new Intl.DateTimeFormat('pt-BR', options).format(date);
+  }
+
+  function renderTabela() {
+    tabelaCorpo.innerHTML = '';
+    equipamentos.forEach((equip, idx) => {
+      const tr = document.createElement('tr');
+
+      const tdNome = document.createElement('td');
+      tdNome.textContent = equip.nome;
+
+      const tdStatus = document.createElement('td');
+      tdStatus.textContent = equip.status.charAt(0).toUpperCase() + equip.status.slice(1);
+      tdStatus.className = `status-${equip.status}`;
+
+      const tdCausa = document.createElement('td');
+      tdCausa.textContent = equip.causa || '-';
+
+      const tdDescricao = document.createElement('td');
+      tdDescricao.textContent = equip.descricao || '-';
+
+      const tdHoraInicio = document.createElement('td');
+      tdHoraInicio.textContent = equip.horaInicio || '-';
+
+      const tdHoraFim = document.createElement('td');
+      tdHoraFim.textContent = equip.horaFim || '-';
+
+      const tdDataHora = document.createElement('td');
+      tdDataHora.textContent = equip.dataHoraCadastro || '-';
+
+      const tdAcoes = document.createElement('td');
+      tdAcoes.innerHTML = `
+        <button class="btn editar" onclick="editarEquipamento(${idx})">Editar</button>
+        <button class="btn excluir" onclick="excluirEquipamento(${idx})">Excluir</button>
+      `;
+
+      tr.appendChild(tdNome);
+      tr.appendChild(tdStatus);
+      tr.appendChild(tdCausa);
+      tr.appendChild(tdDescricao);
+      tr.appendChild(tdHoraInicio);
+      tr.appendChild(tdHoraFim);
+      tr.appendChild(tdDataHora);
+      tr.appendChild(tdAcoes);
+
+      tabelaCorpo.appendChild(tr);
+    });
+  }
+
+  form.addEventListener('submit', function(event) {
+    event.preventDefault();
+
+    const nome = nomeInput.value.trim();
+    const status = statusSelect.value;
+    const causa = causaInput.value.trim();
+    const descricao = descricaoInput.value.trim(); // Get the description
+    const horaInicio = horaInicioInput.value;
+    const horaFim = horaFimInput.value;
+
+    if (!nome || !status) return;
+
+    const dataHoraCadastro = formatDateTime(new Date());
+
+    const equipamentoObj = {
+      id: editandoIndex !== null ? equipamentos[editandoIndex].id : nextId++,
+      nome,
+      status,
+      causa,
+      descricao, // Include the description in the object
+      horaInicio,
+      horaFim,
+      dataHoraCadastro
+    };
+
+    if (editandoIndex !== null) {
+      equipamentos[editandoIndex] = equipamentoObj;
+      editandoIndex = null;
+    } else {
+      equipamentos.push(equipamentoObj);
+    }
+
+    renderTabela();
+    salvarDados();
+    form.reset();
+  });
+
+  window.editarEquipamento = function(index) {
+    const equip = equipamentos[index];
+    nomeInput.value = equip.nome;
+    statusSelect.value = equip.status;
+    causaInput.value = equip.causa || '';
+    descricaoInput.value = equip.descricao || '';
+    horaInicioInput.value = equip.horaInicio || '';
+    horaFimInput.value = equip.horaFim || '';
+    editandoIndex = index;
+    nomeInput.focus();
+  };
+
+  window.excluirEquipamento = function(index) {
+    equipamentos.splice(index, 1);
+    renderTabela();
+    salvarDados();
+  };
+
+  // Carregar dados ao iniciar a página
+  carregarDados();
+  renderTabela();
+</script>
+
+</body>
+</html>
