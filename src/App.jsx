@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { hasSupabaseEnv, supabase } from './lib/supabaseClient';
 
 const STORAGE_KEY = 'Status_Mina_Data';
@@ -57,27 +57,20 @@ function toSupabasePayload(item) {
   };
 }
 
-function Topo({ statusConexao }) {
+function Topo() {
   return (
     <section className="hero">
       <div>
-        <p className="kicker">CENTRO DE CONTROLE OPERACIONAL</p>
         <h1>Status Equipamentos Moveis Mina</h1>
-        <p>
-          Painel tecnico para monitoramento de disponibilidade, manutencao e desempenho dos
-          equipamentos moveis.
-        </p>
-        <span className="badge">{statusConexao}</span>
       </div>
-      <div className="hero-brand">
+      <div className="hero-side">
         <img src="/stratos.png" alt="Slogan da Stratos" />
-        <p>Stratos: compromisso com disponibilidade, seguranca e performance operacional.</p>
       </div>
     </section>
   );
 }
 
-function Navegacao() {
+function Navegacao({ onLogout }) {
   return (
     <nav className="nav-tabs" aria-label="Navegacao do painel">
       <Link to="/dashboard" className="tab-link">
@@ -89,11 +82,80 @@ function Navegacao() {
       <Link to="/status" className="tab-link">
         Status dos Equipamentos
       </Link>
+      <button type="button" className="tab-link logout-link" onClick={onLogout}>
+        Sair
+      </button>
     </nav>
   );
 }
 
-export default function App() {
+function LoginPage({ onLogin }) {
+  const navigate = useNavigate();
+  const [usuario, setUsuario] = useState('');
+  const [senha, setSenha] = useState('');
+  const [erro, setErro] = useState('');
+  const [loadingLogin, setLoadingLogin] = useState(false);
+
+  async function onSubmitLogin(event) {
+    event.preventDefault();
+    setLoadingLogin(true);
+    const erroLogin = await onLogin(usuario, senha);
+    setLoadingLogin(false);
+
+    if (erroLogin) {
+      setErro(erroLogin);
+      return;
+    }
+
+    setErro('');
+    navigate('/dashboard', { replace: true });
+  }
+
+  return (
+    <main className="auth-shell">
+      <section className="auth-card">
+        <div className="auth-brand">
+          <img src="/stratos.png" alt="Slogan da Stratos" />
+        </div>
+        <h1>Status Equipamentos Moveis</h1>
+        <p>Informe email (login) e senha para acessar o sistema.</p>
+
+        <form className="auth-form" onSubmit={onSubmitLogin}>
+          <label htmlFor="usuario">Email (Login)</label>
+          <input
+            id="usuario"
+            name="usuario"
+            type="email"
+            placeholder="Digite seu email"
+            value={usuario}
+            onChange={(event) => setUsuario(event.target.value)}
+            required
+          />
+
+          <label htmlFor="senha">Senha</label>
+          <input
+            id="senha"
+            name="senha"
+            type="password"
+            placeholder="Digite sua senha"
+            value={senha}
+            onChange={(event) => setSenha(event.target.value)}
+            required
+          />
+
+          <button type="submit" disabled={loadingLogin}>
+            {loadingLogin ? 'Entrando...' : 'Entrar'}
+          </button>
+        </form>
+
+        {erro && <p className="feedback error">{erro}</p>}
+      </section>
+    </main>
+  );
+}
+
+function AppContent({ onLogout }) {
+  const navigate = useNavigate();
   const [equipamentos, setEquipamentos] = useState([]);
   const [formData, setFormData] = useState(emptyForm);
   const [editandoId, setEditandoId] = useState(null);
@@ -101,23 +163,17 @@ export default function App() {
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
 
-  const statusConexao = useMemo(() => {
-    if (hasSupabaseEnv) {
-      return 'Conectado ao Supabase';
-    }
-
-    return 'Modo local (sem Supabase configurado)';
-  }, []);
-
   const dashboard = useMemo(() => {
     const total = equipamentos.length;
     const parados = equipamentos.filter((item) => item.status === 'parado').length;
     const liberados = equipamentos.filter((item) => item.status === 'liberado').length;
+    const aguardandoPeca = equipamentos.filter((item) => item.status === 'aguardandoMaterial').length;
 
     return {
       total,
       parados,
       liberados,
+      aguardandoPeca,
       taxaParados: total > 0 ? Math.round((parados / total) * 100) : 0,
       taxaLiberados: total > 0 ? Math.round((liberados / total) * 100) : 0
     };
@@ -268,6 +324,7 @@ export default function App() {
     setEditandoId(item.id);
     setMensagem('');
     setErro('');
+    navigate('/');
   }
 
   async function excluirEquipamento(itemId) {
@@ -294,76 +351,79 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <main className="app-shell">
-        <Topo statusConexao={statusConexao} />
-        <Navegacao />
+    <main className="app-shell">
+      <Topo />
+      <Navegacao onLogout={onLogout} />
 
-        <Routes>
-          <Route
-            path="/dashboard"
-            element={
-              <section className="panel">
-                <h2>Dashboard Operacional</h2>
-                {loading ? (
-                  <p>Carregando indicadores...</p>
-                ) : (
-                  <>
-                    <div className="dash-grid">
-                      <article className="dash-card total">
-                        <h3>Total de Equipamentos</h3>
-                        <p>{dashboard.total}</p>
-                      </article>
-                      <article className="dash-card stopped">
-                        <h3>Equipamentos Parados</h3>
-                        <p>{dashboard.parados}</p>
-                        <small>{dashboard.taxaParados}% do total</small>
-                      </article>
-                      <article className="dash-card released">
-                        <h3>Equipamentos Liberados</h3>
-                        <p>{dashboard.liberados}</p>
-                        <small>{dashboard.taxaLiberados}% do total</small>
-                      </article>
-                    </div>
+      <Routes>
+        <Route
+          path="/dashboard"
+          element={
+            <section className="panel">
+              <h2>Dashboard Operacional</h2>
+              {loading ? (
+                <p>Carregando indicadores...</p>
+              ) : (
+                <>
+                  <div className="dash-grid">
+                    <article className="dash-card total">
+                      <h3>Total de Equipamentos</h3>
+                      <p>{dashboard.total}</p>
+                    </article>
+                    <article className="dash-card total">
+                      <h3>Aguardando Peca</h3>
+                      <p>{dashboard.aguardandoPeca}</p>
+                    </article>
+                    <article className="dash-card stopped">
+                      <h3>Equipamentos Parados</h3>
+                      <p>{dashboard.parados}</p>
+                      <small>{dashboard.taxaParados}% do total</small>
+                    </article>
+                    <article className="dash-card released">
+                      <h3>Equipamentos Liberados</h3>
+                      <p>{dashboard.liberados}</p>
+                      <small>{dashboard.taxaLiberados}% do total</small>
+                    </article>
+                  </div>
 
-                    <div className="dash-list">
-                      <h3>Parados no momento</h3>
-                      {dashboard.parados === 0 ? (
-                        <p>Nenhum equipamento parado.</p>
-                      ) : (
-                        <ul>
-                          {equipamentos
-                            .filter((item) => item.status === 'parado')
-                            .map((item) => (
-                              <li key={item.id}>
-                                <strong>{item.nome}</strong> - {item.causa || 'Sem causa informada'}
-                              </li>
-                            ))}
-                        </ul>
-                      )}
-                    </div>
-                  </>
-                )}
-              </section>
-            }
-          />
-          <Route
-            path="/"
-            element={
-              <section className="panel">
-                <h2>Painel de Registros</h2>
+                  <div className="dash-list">
+                    <h3>Parados no momento</h3>
+                    {dashboard.parados === 0 ? (
+                      <p>Nenhum equipamento parado.</p>
+                    ) : (
+                      <ul>
+                        {equipamentos
+                          .filter((item) => item.status === 'parado')
+                          .map((item) => (
+                            <li key={item.id}>
+                              <strong>{item.nome}</strong> - {item.causa || 'Sem causa informada'}
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )}
+            </section>
+          }
+        />
+        <Route
+          path="/"
+          element={
+            <section className="panel">
+              <h2>Painel de Registros</h2>
 
-                <form className="form-grid" onSubmit={onSubmit}>
-                  <label htmlFor="nome">Tag do Equipamento</label>
-                  <input
-                    id="nome"
-                    name="nome"
-                    type="text"
-                    placeholder="Digite o Tag do equipamento (Ex: 14CR10)"
-                    required
-                    value={formData.nome}
-                    onChange={onInputChange}
-                  />
+              <form className="form-grid" onSubmit={onSubmit}>
+                <label htmlFor="nome">Tag do Equipamento</label>
+                <input
+                  id="nome"
+                  name="nome"
+                  type="text"
+                  placeholder="Digite o Tag do equipamento (Ex: 14CR10)"
+                  required
+                  value={formData.nome}
+                  onChange={onInputChange}
+                />
 
                   <label htmlFor="status">Status</label>
                   <select
@@ -429,73 +489,175 @@ export default function App() {
                   </div>
                 </form>
 
-                {mensagem && <p className="feedback success">{mensagem}</p>}
-                {erro && <p className="feedback error">{erro}</p>}
-              </section>
-            }
-          />
-          <Route
-            path="/status"
-            element={
-              <section className="panel">
-                <h2>Status Equipamentos Moveis</h2>
-                {loading ? (
-                  <p>Carregando...</p>
-                ) : (
-                  <div className="table-wrap">
-                    <table>
-                      <thead>
+              {mensagem && <p className="feedback success">{mensagem}</p>}
+              {erro && <p className="feedback error">{erro}</p>}
+            </section>
+          }
+        />
+        <Route
+          path="/status"
+          element={
+            <section className="panel">
+              <h2>Status Equipamentos Moveis</h2>
+              {loading ? (
+                <p>Carregando...</p>
+              ) : (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Equipamento</th>
+                        <th>Status</th>
+                        <th>Causa da Parada</th>
+                        <th>Descricao</th>
+                        <th>Horario Inicio</th>
+                        <th>Horario Fim</th>
+                        <th>Data e Hora Cadastro</th>
+                        <th>Acoes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {equipamentos.length === 0 ? (
                         <tr>
-                          <th>Equipamento</th>
-                          <th>Status</th>
-                          <th>Causa da Parada</th>
-                          <th>Descricao</th>
-                          <th>Horario Inicio</th>
-                          <th>Horario Fim</th>
-                          <th>Data e Hora Cadastro</th>
-                          <th>Acoes</th>
+                          <td colSpan="8">Nenhum registro encontrado.</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {equipamentos.length === 0 ? (
-                          <tr>
-                            <td colSpan="8">Nenhum registro encontrado.</td>
+                      ) : (
+                        equipamentos.map((item) => (
+                          <tr key={item.id}>
+                            <td>{item.nome}</td>
+                            <td>
+                              <span className={`status-chip status-${item.status}`}>
+                                {statusOptions.find((option) => option.value === item.status)?.label ?? item.status}
+                              </span>
+                            </td>
+                            <td>{item.causa || '-'}</td>
+                            <td>{item.descricao || '-'}</td>
+                            <td>{item.horaInicio || '-'}</td>
+                            <td>{item.horaFim || '-'}</td>
+                            <td>{item.dataHoraCadastro || '-'}</td>
+                            <td className="actions-cell">
+                              <button className="small" onClick={() => editarEquipamento(item)}>
+                                Editar
+                              </button>
+                              <button className="small danger" onClick={() => excluirEquipamento(item.id)}>
+                                Excluir
+                              </button>
+                            </td>
                           </tr>
-                        ) : (
-                          equipamentos.map((item) => (
-                            <tr key={item.id}>
-                              <td>{item.nome}</td>
-                              <td>
-                                <span className={`status-chip status-${item.status}`}>
-                                  {statusOptions.find((option) => option.value === item.status)?.label ?? item.status}
-                                </span>
-                              </td>
-                              <td>{item.causa || '-'}</td>
-                              <td>{item.descricao || '-'}</td>
-                              <td>{item.horaInicio || '-'}</td>
-                              <td>{item.horaFim || '-'}</td>
-                              <td>{item.dataHoraCadastro || '-'}</td>
-                              <td className="actions-cell">
-                                <button className="small" onClick={() => editarEquipamento(item)}>
-                                  Editar
-                                </button>
-                                <button className="small danger" onClick={() => excluirEquipamento(item.id)}>
-                                  Excluir
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </main>
+  );
+}
+
+export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    if (!hasSupabaseEnv || !supabase) {
+      setAuthLoading(false);
+      return;
+    }
+
+    let ativo = true;
+
+    const carregarSessao = async () => {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (!ativo) {
+        return;
+      }
+
+      if (error) {
+        setIsAuthenticated(false);
+      } else {
+        setIsAuthenticated(Boolean(data.session));
+      }
+
+      setAuthLoading(false);
+    };
+
+    void carregarSessao();
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(Boolean(session));
+      setAuthLoading(false);
+    });
+
+    return () => {
+      ativo = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function fazerLogin(usuario, senha) {
+    if (!hasSupabaseEnv || !supabase) {
+      return 'Supabase nao configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.';
+    }
+
+    const email = usuario.trim().toLowerCase();
+
+    if (!email || !senha) {
+      return 'Informe email e senha.';
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: senha
+    });
+
+    if (error) {
+      return 'Login ou senha invalidos.';
+    }
+
+    return '';
+  }
+
+  async function sairDoSistema() {
+    if (hasSupabaseEnv && supabase) {
+      await supabase.auth.signOut();
+    }
+
+    setIsAuthenticated(false);
+  }
+
+  if (authLoading) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-card">
+          <h1>Status Equipamentos Moveis</h1>
+          <p>Validando sessao...</p>
+        </section>
       </main>
+    );
+  }
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/login"
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage onLogin={fazerLogin} />}
+        />
+        <Route
+          path="/*"
+          element={
+            isAuthenticated ? <AppContent onLogout={sairDoSistema} /> : <Navigate to="/login" replace />
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }
