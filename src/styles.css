@@ -571,6 +571,54 @@ tbody tr:hover {
   min-width: 1080px;
 }
 
+.relatorio-row-item {
+  cursor: pointer;
+}
+
+.relatorio-row-item.is-selected td {
+  background: #e8f1ff;
+}
+
+.relatorio-read-card {
+  background: #ffffff;
+  border: 1px solid #b2cbef;
+  border-radius: 14px;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.relatorio-read-card h3 {
+  margin: 0;
+  color: #1d477d;
+}
+
+.relatorio-read-card p,
+.relatorio-read-card small {
+  margin: 0;
+  color: #254d7c;
+}
+
+.relatorio-read-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 0.6rem;
+}
+
+.relatorio-read-grid article,
+.relatorio-read-summary {
+  border: 1px solid #c8dcf8;
+  border-radius: 10px;
+  padding: 0.65rem;
+  background: #f7fbff;
+}
+
+.relatorio-read-grid h4,
+.relatorio-read-summary h4 {
+  margin: 0 0 0.35rem;
+  color: #173d72;
+}
+
 .turno-chip,
 .turma-chip {
   display: inline-block;
@@ -638,6 +686,10 @@ tbody tr:hover {
 
   .relatorio-kpis,
   .relatorio-row {
+    grid-template-columns: 1fr;
+  }
+
+  .relatorio-read-grid {
     grid-template-columns: 1fr;
   }
 }

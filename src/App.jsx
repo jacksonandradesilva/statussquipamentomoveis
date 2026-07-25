@@ -58,6 +58,20 @@ function formatDateTime(date) {
   }).format(date);
 }
 
+function formatDateOnly(dateText) {
+  if (!dateText) {
+    return '-';
+  }
+
+  const [year, month, day] = dateText.split('-');
+
+  if (!year || !month || !day) {
+    return dateText;
+  }
+
+  return `${day}/${month}/${year}`;
+}
+
 function fromSupabaseRow(row) {
   return {
     id: row.id,
@@ -911,6 +925,7 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
   const [relatorioMensagem, setRelatorioMensagem] = useState('');
   const [relatorioErro, setRelatorioErro] = useState('');
   const [filtroTurno, setFiltroTurno] = useState('TODOS');
+  const [relatorioSelecionadoId, setRelatorioSelecionadoId] = useState(null);
 
   const landingPath = getLandingPath(pageAccess, isAdmin);
 
@@ -949,10 +964,26 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
     return relatorios.filter((item) => item.turno === filtroTurno);
   }, [relatorios, filtroTurno]);
 
+  const relatorioSelecionado = useMemo(
+    () => relatorios.find((item) => item.id === relatorioSelecionadoId) ?? null,
+    [relatorios, relatorioSelecionadoId]
+  );
+
   useEffect(() => {
     void carregarDados();
     void carregarRelatorios();
   }, []);
+
+  useEffect(() => {
+    if (relatorios.length === 0) {
+      setRelatorioSelecionadoId(null);
+      return;
+    }
+
+    setRelatorioSelecionadoId((atual) =>
+      relatorios.some((item) => item.id === atual) ? atual : relatorios[0].id
+    );
+  }, [relatorios]);
 
   async function carregarDados() {
     setLoading(true);
@@ -1252,6 +1283,42 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
     salvarRelatoriosLocal(lista);
     setRelatorioMensagem('Relatorio diario salvo localmente.');
     limparRelatorioFormulario();
+  }
+
+  async function excluirRelatorio(item) {
+    setRelatorioMensagem('');
+    setRelatorioErro('');
+
+    const confirmou = window.confirm(
+      `Deseja excluir o relatorio do turno ${item.turno || '-'} / turma ${item.turma || '-'} da data ${item.dataReferencia || '-'}?`
+    );
+
+    if (!confirmou) {
+      return;
+    }
+
+    if (hasSupabaseEnv) {
+      const { error } = await supabase.from('relatorios_diarios_turno').delete().eq('id', item.id);
+
+      if (error) {
+        setRelatorioErro(`Falha ao excluir relatorio no Supabase: ${error.message}`);
+        return;
+      }
+
+      setRelatorioMensagem('Relatorio diario excluido com sucesso.');
+      await onRegistrarHistorico({
+        email: currentUserEmail,
+        acao: 'exclusao_relatorio_diario',
+        detalhes: `Relatorio ID ${item.id} excluido (turno ${item.turno}, turma ${item.turma}, data ${item.dataReferencia})`
+      });
+      await carregarRelatorios();
+      return;
+    }
+
+    const lista = relatorios.filter((relatorio) => relatorio.id !== item.id);
+    setRelatorios(lista);
+    salvarRelatoriosLocal(lista);
+    setRelatorioMensagem('Relatorio diario excluido localmente.');
   }
 
   return (
@@ -1590,16 +1657,21 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
                       <th>Lider Tecnico</th>
                       <th>Resumo</th>
                       <th>Criado em</th>
+                      <th>Acoes</th>
                     </tr>
                   </thead>
                   <tbody>
                     {relatoriosFiltrados.length === 0 ? (
                       <tr>
-                        <td colSpan="9">Nenhum relatorio diario cadastrado.</td>
+                        <td colSpan="10">Nenhum relatorio diario cadastrado.</td>
                       </tr>
                     ) : (
                       relatoriosFiltrados.map((item) => (
-                        <tr key={item.id}>
+                        <tr
+                          key={item.id}
+                          className={`relatorio-row-item ${item.id === relatorioSelecionadoId ? 'is-selected' : ''}`}
+                          onClick={() => setRelatorioSelecionadoId(item.id)}
+                        >
                           <td>{item.dataReferencia || '-'}</td>
                           <td>
                             <span className="turno-chip">Turno {item.turno || '-'}</span>
@@ -1613,12 +1685,65 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
                           <td>{item.liderTecnico || '-'}</td>
                           <td>{item.resumo || '-'}</td>
                           <td>{item.criadoEm ? formatDateTime(new Date(item.criadoEm)) : '-'}</td>
+                          <td className="actions-cell">
+                            <button
+                              type="button"
+                              className="small"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setRelatorioSelecionadoId(item.id);
+                              }}
+                            >
+                              Ler
+                            </button>
+                            <button
+                              type="button"
+                              className="small danger"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void excluirRelatorio(item);
+                              }}
+                            >
+                              Excluir
+                            </button>
+                          </td>
                         </tr>
                       ))
                     )}
                   </tbody>
                 </table>
               </div>
+
+              {relatorioSelecionado && (
+                <section className="relatorio-read-card" aria-live="polite">
+                  <h3>Leitura do Relatorio Selecionado</h3>
+                  <p>
+                    Data {formatDateOnly(relatorioSelecionado.dataReferencia)} | Turno {relatorioSelecionado.turno || '-'} |
+                    Turma {relatorioSelecionado.turma || '-'}
+                  </p>
+                  <div className="relatorio-read-grid">
+                    <article>
+                      <h4>Janela de Horario</h4>
+                      <p>
+                        Inicio: {relatorioSelecionado.horaInicio || '-'} | Fim: {relatorioSelecionado.horaFim || '-'}
+                      </p>
+                    </article>
+                    <article>
+                      <h4>Responsaveis</h4>
+                      <p>Supervisao: {relatorioSelecionado.supervisao || '-'}</p>
+                      <p>Lider Tecnico: {relatorioSelecionado.liderTecnico || '-'}</p>
+                    </article>
+                  </div>
+                  <article className="relatorio-read-summary">
+                    <h4>Resumo do Turno</h4>
+                    <p>{relatorioSelecionado.resumo || 'Sem resumo informado.'}</p>
+                  </article>
+                  <small>
+                    Cadastrado em:{' '}
+                    {relatorioSelecionado.criadoEm ? formatDateTime(new Date(relatorioSelecionado.criadoEm)) : '-'}
+                  </small>
+                </section>
+              )}
             </section>
           }
         />
