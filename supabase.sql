@@ -6,9 +6,14 @@ create table if not exists public.equipamentos_mina (
   descricao text,
   hora_inicio text,
   hora_fim text,
+  previsao_liberacao date,
+  quantidade_dias integer,
   data_hora_cadastro text,
   created_at timestamptz not null default now()
 );
+
+alter table public.equipamentos_mina add column if not exists previsao_liberacao date;
+alter table public.equipamentos_mina add column if not exists quantidade_dias integer;
 
 alter table public.equipamentos_mina enable row level security;
 
@@ -44,6 +49,8 @@ create table if not exists public.acessos_sistema (
   acesso_dashboard boolean not null default true,
   acesso_registros boolean not null default false,
   acesso_status boolean not null default false,
+  acesso_status_previsto boolean not null default false,
+  acesso_relatorios boolean not null default false,
   pode_editar_status boolean not null default false,
   pode_excluir_status boolean not null default false,
   solicitado_em timestamptz not null default now(),
@@ -54,6 +61,8 @@ create table if not exists public.acessos_sistema (
 alter table public.acessos_sistema add column if not exists acesso_dashboard boolean not null default true;
 alter table public.acessos_sistema add column if not exists acesso_registros boolean not null default false;
 alter table public.acessos_sistema add column if not exists acesso_status boolean not null default false;
+alter table public.acessos_sistema add column if not exists acesso_status_previsto boolean not null default false;
+alter table public.acessos_sistema add column if not exists acesso_relatorios boolean not null default false;
 alter table public.acessos_sistema add column if not exists pode_editar_status boolean not null default false;
 alter table public.acessos_sistema add column if not exists pode_excluir_status boolean not null default false;
 

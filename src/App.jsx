@@ -9,7 +9,9 @@ const ADMIN_CONTACT_EMAIL = 'jacksonandradesilva33@gmail.com';
 const DEFAULT_PAGE_ACCESS = {
   dashboard: true,
   registros: false,
-  status: false
+  status: false,
+  statusPrevisto: false,
+  relatorios: false
 };
 const DEFAULT_STATUS_ACTIONS = {
   editar: false,
@@ -33,7 +35,9 @@ const emptyForm = {
   causa: '',
   descricao: '',
   horaInicio: '',
-  horaFim: ''
+  horaFim: '',
+  previsaoLiberacao: '',
+  quantidadeDias: ''
 };
 
 const emptyRelatorioForm = {
@@ -72,6 +76,49 @@ function formatDateOnly(dateText) {
   return `${day}/${month}/${year}`;
 }
 
+function parseDateValue(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return new Date(`${year}-${month}-${day}T00:00:00`);
+  }
+
+  const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (brMatch) {
+    const [, day, month, year] = brMatch;
+    return new Date(`${year}-${month}-${day}T00:00:00`);
+  }
+
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function calcularQuantidadeDias(dataCadastro, previsaoLiberacao) {
+  const dataCadastroParsed = parseDateValue(dataCadastro);
+  const previsaoParsed = parseDateValue(previsaoLiberacao);
+
+  if (!dataCadastroParsed || !previsaoParsed) {
+    return '';
+  }
+
+  const diffDays = Math.round((previsaoParsed.getTime() - dataCadastroParsed.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays >= 0 ? diffDays : '';
+}
+
 function fromSupabaseRow(row) {
   return {
     id: row.id,
@@ -81,6 +128,8 @@ function fromSupabaseRow(row) {
     descricao: row.descricao ?? '',
     horaInicio: row.hora_inicio ?? '',
     horaFim: row.hora_fim ?? '',
+    previsaoLiberacao: row.previsao_liberacao ?? '',
+    quantidadeDias: row.quantidade_dias ?? calcularQuantidadeDias(row.data_hora_cadastro, row.previsao_liberacao),
     dataHoraCadastro: row.data_hora_cadastro ?? ''
   };
 }
@@ -93,6 +142,8 @@ function toSupabasePayload(item) {
     descricao: item.descricao,
     hora_inicio: item.horaInicio,
     hora_fim: item.horaFim,
+    previsao_liberacao: item.previsaoLiberacao,
+    quantidade_dias: item.quantidadeDias === '' || item.quantidadeDias == null ? null : Number(item.quantidadeDias),
     data_hora_cadastro: item.dataHoraCadastro
   };
 }
@@ -141,7 +192,9 @@ function getAdminAccess() {
   return {
     dashboard: true,
     registros: true,
-    status: true
+    status: true,
+    statusPrevisto: true,
+    relatorios: true
   };
 }
 
@@ -156,7 +209,9 @@ function fromAcessoRowToPageAccess(row) {
   return {
     dashboard: Boolean(row?.acesso_dashboard),
     registros: Boolean(row?.acesso_registros),
-    status: Boolean(row?.acesso_status)
+    status: Boolean(row?.acesso_status),
+    statusPrevisto: Boolean(row?.acesso_status_previsto),
+    relatorios: Boolean(row?.acesso_relatorios)
   };
 }
 
@@ -182,6 +237,14 @@ function getLandingPath(pageAccess, isAdmin) {
 
   if (pageAccess.status) {
     return '/status';
+  }
+
+  if (pageAccess.statusPrevisto) {
+    return '/status-previsto';
+  }
+
+  if (pageAccess.relatorios) {
+    return '/relatorios';
   }
 
   return '/sem-acesso';
@@ -215,13 +278,20 @@ function Navegacao({ onLogout, isAdmin, pageAccess }) {
         </Link>
       )}
       {(isAdmin || pageAccess.status) && (
-        <Link to="/status" className="tab-link">
-          Status dos Equipamentos
+        <>
+          <Link to="/status" className="tab-link">
+            Status dos Equipamentos
+          </Link>
+          <Link to="/status-previsto" className="tab-link">
+            Status Previsto
+          </Link>
+        </>
+      )}
+      {(isAdmin || pageAccess.relatorios) && (
+        <Link to="/relatorios" className="tab-link">
+          Relatorio Diario
         </Link>
       )}
-      <Link to="/relatorios" className="tab-link">
-        Relatorio Diario
-      </Link>
       {isAdmin && (
         <Link to="/admin" className="tab-link">
           Admin
@@ -429,7 +499,7 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
     const { data, error } = await supabase
       .from('acessos_sistema')
       .select(
-        'id, email, status, solicitado_em, liberado_em, liberado_por, acesso_dashboard, acesso_registros, acesso_status, pode_editar_status, pode_excluir_status'
+        'id, email, status, solicitado_em, liberado_em, liberado_por, acesso_dashboard, acesso_registros, acesso_status, acesso_status_previsto, acesso_relatorios, pode_editar_status, pode_excluir_status'
       )
       .order('solicitado_em', { ascending: false });
 
@@ -450,6 +520,8 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
         acesso_dashboard: Boolean(item.acesso_dashboard),
         acesso_registros: Boolean(item.acesso_registros),
         acesso_status: Boolean(item.acesso_status),
+        acesso_status_previsto: Boolean(item.acesso_status_previsto),
+        acesso_relatorios: Boolean(item.acesso_relatorios),
         pode_editar_status: Boolean(item.pode_editar_status),
         pode_excluir_status: Boolean(item.pode_excluir_status)
       };
@@ -549,6 +621,8 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
           acesso_dashboard: false,
           acesso_registros: false,
           acesso_status: false,
+          acesso_status_previsto: false,
+          acesso_relatorios: false,
           pode_editar_status: false,
           pode_excluir_status: false
         }),
@@ -570,7 +644,7 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
       return;
     }
 
-    if (!draft.acesso_dashboard && !draft.acesso_registros && !draft.acesso_status) {
+    if (!draft.acesso_dashboard && !draft.acesso_registros && !draft.acesso_status && !draft.acesso_status_previsto && !draft.acesso_relatorios) {
       setErroSolicitacoes('Selecione ao menos uma pagina para acesso.');
       return;
     }
@@ -585,6 +659,8 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
         acesso_dashboard: draft.acesso_dashboard,
         acesso_registros: draft.acesso_registros,
         acesso_status: draft.acesso_status,
+        acesso_status_previsto: draft.acesso_status_previsto,
+        acesso_relatorios: draft.acesso_relatorios,
         pode_editar_status: draft.pode_editar_status,
         pode_excluir_status: draft.pode_excluir_status,
         liberado_por: normalizeEmail(currentUserEmail)
@@ -677,6 +753,22 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
                             onChange={(event) => onPermissaoChange(item.id, 'acesso_status', event.target.checked)}
                           />
                           Status
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(permissoesDraft[item.id]?.acesso_status_previsto)}
+                            onChange={(event) => onPermissaoChange(item.id, 'acesso_status_previsto', event.target.checked)}
+                          />
+                          Status Previsto
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(permissoesDraft[item.id]?.acesso_relatorios)}
+                            onChange={(event) => onPermissaoChange(item.id, 'acesso_relatorios', event.target.checked)}
+                          />
+                          Relatorios
                         </label>
                       </div>
                     </td>
@@ -862,6 +954,9 @@ function AdminHistoricoPage() {
 }
 
 function DashboardSection({ loading, dashboard, equipamentos }) {
+  const previsoes = equipamentos.filter((item) => item.previsaoLiberacao || item.quantidadeDias);
+  const prazosNaoConcluidos = equipamentos.filter((item) => item.status !== 'liberado' && !item.previsaoLiberacao && !item.quantidadeDias);
+
   return (
     <section className="panel">
       <h2>Dashboard Operacional</h2>
@@ -903,6 +998,38 @@ function DashboardSection({ loading, dashboard, equipamentos }) {
                       <strong>{item.nome}</strong> - {item.causa || 'Sem causa informada'}
                     </li>
                   ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
+            <h3>Previsoes de liberacao</h3>
+            {previsoes.length === 0 ? (
+              <p>Nenhuma previsao cadastrada.</p>
+            ) : (
+              <ul>
+                {previsoes.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - Previsao:{' '}
+                    {item.previsaoLiberacao ? formatDateOnly(item.previsaoLiberacao) : '-'} {'/'} Dias:{' '}
+                    {item.quantidadeDias || '-'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
+            <h3>Prazos não concluídos</h3>
+            {prazosNaoConcluidos.length === 0 ? (
+              <p>Nenhum prazo pendente.</p>
+            ) : (
+              <ul>
+                {prazosNaoConcluidos.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - Sem previsao de liberacao cadastrada.
+                  </li>
+                ))}
               </ul>
             )}
           </div>
@@ -1115,6 +1242,8 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
       descricao: formData.descricao.trim(),
       horaInicio: formData.horaInicio,
       horaFim: formData.horaFim,
+      previsaoLiberacao: formData.previsaoLiberacao,
+      quantidadeDias: calcularQuantidadeDias(now, formData.previsaoLiberacao),
       dataHoraCadastro: now
     };
 
@@ -1189,7 +1318,9 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
       causa: item.causa ?? '',
       descricao: item.descricao ?? '',
       horaInicio: item.horaInicio ?? '',
-      horaFim: item.horaFim ?? ''
+      horaFim: item.horaFim ?? '',
+      previsaoLiberacao: item.previsaoLiberacao ?? '',
+      quantidadeDias: item.quantidadeDias ?? ''
     });
     setEditandoId(item.id);
     setMensagem('');
@@ -1406,6 +1537,15 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
                     onChange={onInputChange}
                   />
 
+                  <label htmlFor="previsaoLiberacao">Previsao de Liberacao</label>
+                  <input
+                    id="previsaoLiberacao"
+                    name="previsaoLiberacao"
+                    type="date"
+                    value={formData.previsaoLiberacao}
+                    onChange={onInputChange}
+                  />
+
                   <div className="actions">
                     <button type="submit">{editandoId === null ? 'Cadastrar' : 'Atualizar'}</button>
                     <button type="button" className="ghost" onClick={limparFormulario}>
@@ -1491,9 +1631,59 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
           }
         />
         <Route
+          path="/status-previsto"
+          element={
+            isAdmin || pageAccess.statusPrevisto ? (
+              <section className="panel">
+                <h2>Status Equipamentos Moveis - Previsao de Liberacao</h2>
+                <p>Consulte a previsao de liberacao e a quantidade de dias calculada automaticamente a partir da data de cadastro e da previsao informada.</p>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Equipamento</th>
+                        <th>Status</th>
+                        <th>Previsao de Liberacao</th>
+                        <th>Quantidade de Dias</th>
+                        <th>Causa da Parada</th>
+                        <th>Descricao</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {equipamentos.length === 0 ? (
+                        <tr>
+                          <td colSpan="6">Nenhum registro encontrado.</td>
+                        </tr>
+                      ) : (
+                        equipamentos.map((item) => (
+                          <tr key={item.id}>
+                            <td>{item.nome}</td>
+                            <td>
+                              <span className={`status-chip status-${item.status}`}>
+                                {statusOptions.find((option) => option.value === item.status)?.label ?? item.status}
+                              </span>
+                            </td>
+                            <td>{item.previsaoLiberacao ? formatDateOnly(item.previsaoLiberacao) : '-'}</td>
+                            <td>{item.quantidadeDias ? item.quantidadeDias : '-'}</td>
+                            <td>{item.causa || '-'}</td>
+                            <td>{item.descricao || '-'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ) : (
+              <Navigate to={landingPath} replace />
+            )
+          }
+        />
+        <Route
           path="/relatorios"
           element={
-            <section className="panel relatorio-panel">
+            isAdmin || pageAccess.relatorios ? (
+              <section className="panel relatorio-panel">
               <div className="relatorio-header">
                 <div>
                   <h2>Relatorio Diario por Turno</h2>
@@ -1745,6 +1935,9 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
                 </section>
               )}
             </section>
+            ) : (
+              <Navigate to={landingPath} replace />
+            )
           }
         />
         <Route
@@ -1823,7 +2016,7 @@ export default function App() {
 
     const { data, error } = await supabase
       .from('acessos_sistema')
-      .select('status, acesso_dashboard, acesso_registros, acesso_status, pode_editar_status, pode_excluir_status')
+      .select('status, acesso_dashboard, acesso_registros, acesso_status, acesso_status_previsto, acesso_relatorios, pode_editar_status, pode_excluir_status')
       .eq('email', email)
       .maybeSingle();
 
@@ -1858,7 +2051,7 @@ export default function App() {
     const acessos = fromAcessoRowToPageAccess(data);
     const acoesStatus = fromAcessoRowToStatusActions(data);
 
-    if (!acessos.dashboard && !acessos.registros && !acessos.status) {
+    if (!acessos.dashboard && !acessos.registros && !acessos.status && !acessos.statusPrevisto && !acessos.relatorios) {
       return {
         ok: false,
         message: 'Acesso aprovado, mas sem paginas liberadas. Fale com o administrador.',
@@ -2074,6 +2267,8 @@ export default function App() {
       acesso_dashboard: true,
       acesso_registros: false,
       acesso_status: false,
+      acesso_status_previsto: false,
+      acesso_relatorios: false,
       pode_editar_status: false,
       pode_excluir_status: false,
       liberado_em: isAdminEmail(email) ? new Date().toISOString() : null,
