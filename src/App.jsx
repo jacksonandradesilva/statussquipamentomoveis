@@ -115,6 +115,10 @@ function normalizeEmail(email) {
   return (email || '').trim().toLowerCase();
 }
 
+function resolveEquipamentoStatus(status, horaFim) {
+  return horaFim ? 'liberado' : status;
+}
+
 function isAdminEmail(email) {
   return ADMIN_EMAILS.includes(normalizeEmail(email));
 }
@@ -1038,7 +1042,15 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
 
   function onInputChange(event) {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+
+      if (name === 'horaFim') {
+        next.status = resolveEquipamentoStatus(prev.status, value);
+      }
+
+      return next;
+    });
   }
 
   function limparFormulario() {
@@ -1067,7 +1079,7 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
     const now = formatDateTime(new Date());
     const equipamentoPayload = {
       nome: formData.nome.trim(),
-      status: formData.status,
+      status: resolveEquipamentoStatus(formData.status, formData.horaFim),
       causa: formData.causa.trim(),
       descricao: formData.descricao.trim(),
       horaInicio: formData.horaInicio,
