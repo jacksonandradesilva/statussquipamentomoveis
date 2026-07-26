@@ -135,6 +135,11 @@ function fromSupabaseRow(row) {
 }
 
 function toSupabasePayload(item) {
+  const previsaoLiberacao =
+    typeof item.previsaoLiberacao === 'string' && item.previsaoLiberacao.trim() === ''
+      ? null
+      : item.previsaoLiberacao;
+
   return {
     nome: item.nome,
     status: item.status,
@@ -142,7 +147,7 @@ function toSupabasePayload(item) {
     descricao: item.descricao,
     hora_inicio: item.horaInicio,
     hora_fim: item.horaFim,
-    previsao_liberacao: item.previsaoLiberacao,
+    previsao_liberacao: previsaoLiberacao,
     quantidade_dias: item.quantidadeDias === '' || item.quantidadeDias == null ? null : Number(item.quantidadeDias),
     data_hora_cadastro: item.dataHoraCadastro
   };
@@ -278,14 +283,14 @@ function Navegacao({ onLogout, isAdmin, pageAccess }) {
         </Link>
       )}
       {(isAdmin || pageAccess.status) && (
-        <>
-          <Link to="/status" className="tab-link">
-            Status dos Equipamentos
-          </Link>
-          <Link to="/status-previsto" className="tab-link">
-            Status Previsto
-          </Link>
-        </>
+        <Link to="/status" className="tab-link">
+          Status dos Equipamentos
+        </Link>
+      )}
+      {(isAdmin || pageAccess.statusPrevisto) && (
+        <Link to="/status-previsto" className="tab-link">
+          Status Previsto
+        </Link>
       )}
       {(isAdmin || pageAccess.relatorios) && (
         <Link to="/relatorios" className="tab-link">
@@ -1252,7 +1257,7 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
         const { error } = await supabase.from('equipamentos_mina').insert(toSupabasePayload(equipamentoPayload));
 
         if (error) {
-          setErro('Erro ao cadastrar no Supabase.');
+          setErro(`Erro ao cadastrar no Supabase: ${error.message}`);
           return;
         }
 
