@@ -27,6 +27,7 @@ const statusOptions = [
   { value: 'liberado', label: 'Liberado' },
   { value: 'standby', label: 'Standby' },
   { value: 'aguardandoMaterial', label: 'Aguardando Material' },
+  { value: 'faltaMaoDeObra', label: 'Falta de Mao de Obra' },
   { value: 'EquipamentoEmReforma', label: 'Equipamento em Reforma' }
 ];
 
@@ -1049,9 +1050,11 @@ function DashboardSection({ loading, dashboard, equipamentos, jpsDashboard, jps 
   const previsoes = equipamentos.filter((item) => item.previsaoLiberacao || item.quantidadeDias);
   const prazosNaoConcluidos = equipamentos.filter((item) => item.status !== 'liberado' && !item.previsaoLiberacao && !item.quantidadeDias);
   const equipamentosAguardandoMaterial = equipamentos.filter((item) => item.status === 'aguardandoMaterial');
+  const equipamentosFaltaMaoDeObra = equipamentos.filter((item) => item.status === 'faltaMaoDeObra');
   const jpsParados = jps.filter((item) => item.status === 'parado');
   const jpsLiberados = jps.filter((item) => item.status === 'liberado');
   const jpsAguardandoMaterial = jps.filter((item) => item.status === 'aguardandoMaterial');
+  const jpsFaltaMaoDeObra = jps.filter((item) => item.status === 'faltaMaoDeObra');
   const jpsSemPrevisao = jps.filter((item) => item.status === 'parado' && !item.previsaoLiberacao && !item.quantidadeDias);
 
   return (
@@ -1080,6 +1083,10 @@ function DashboardSection({ loading, dashboard, equipamentos, jpsDashboard, jps 
               <p>{dashboard.liberados}</p>
               <small>{dashboard.taxaLiberados}% do total</small>
             </article>
+            <article className="dash-card labor">
+              <h3>Falta de Mao de Obra</h3>
+              <p>{dashboard.faltaMaoDeObra}</p>
+            </article>
           </div>
 
           <div className="dash-grid">
@@ -1100,6 +1107,10 @@ function DashboardSection({ loading, dashboard, equipamentos, jpsDashboard, jps 
             <article className="dash-card total">
               <h3>JPs Aguardando Material</h3>
               <p>{jpsDashboard.aguardandoPeca}</p>
+            </article>
+            <article className="dash-card labor">
+              <h3>JPs Falta de Mao de Obra</h3>
+              <p>{jpsDashboard.faltaMaoDeObra}</p>
             </article>
           </div>
 
@@ -1127,6 +1138,36 @@ function DashboardSection({ loading, dashboard, equipamentos, jpsDashboard, jps 
                 {jpsAguardandoMaterial.map((item) => (
                   <li key={item.id}>
                     <strong>{item.nome}</strong> - Material: {item.descricao || 'Sem descricao do material informada'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
+            <h3>Equipamentos falta de mao de obra</h3>
+            {equipamentosFaltaMaoDeObra.length === 0 ? (
+              <p>Nenhum equipamento em falta de mao de obra.</p>
+            ) : (
+              <ul>
+                {equipamentosFaltaMaoDeObra.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - Descricao: {item.descricao || 'Sem descricao informada'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
+            <h3>JPs falta de mao de obra</h3>
+            {jpsFaltaMaoDeObra.length === 0 ? (
+              <p>Nenhum JP em falta de mao de obra.</p>
+            ) : (
+              <ul>
+                {jpsFaltaMaoDeObra.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - Descricao: {item.descricao || 'Sem descricao informada'}
                   </li>
                 ))}
               </ul>
@@ -1264,12 +1305,14 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
     const parados = equipamentos.filter((item) => item.status === 'parado').length;
     const liberados = equipamentos.filter((item) => item.status === 'liberado').length;
     const aguardandoPeca = equipamentos.filter((item) => item.status === 'aguardandoMaterial').length;
+    const faltaMaoDeObra = equipamentos.filter((item) => item.status === 'faltaMaoDeObra').length;
 
     return {
       total,
       parados,
       liberados,
       aguardandoPeca,
+      faltaMaoDeObra,
       taxaParados: total > 0 ? Math.round((parados / total) * 100) : 0,
       taxaLiberados: total > 0 ? Math.round((liberados / total) * 100) : 0
     };
@@ -1280,12 +1323,14 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
     const parados = jps.filter((item) => item.status === 'parado').length;
     const liberados = jps.filter((item) => item.status === 'liberado').length;
     const aguardandoPeca = jps.filter((item) => item.status === 'aguardandoMaterial').length;
+    const faltaMaoDeObra = jps.filter((item) => item.status === 'faltaMaoDeObra').length;
 
     return {
       total,
       parados,
       liberados,
       aguardandoPeca,
+      faltaMaoDeObra,
       taxaParados: total > 0 ? Math.round((parados / total) * 100) : 0,
       taxaLiberados: total > 0 ? Math.round((liberados / total) * 100) : 0
     };
@@ -2199,7 +2244,7 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
                   <p>Carregando...</p>
                 ) : (
                   <div className="table-wrap">
-                    <table>
+                    <table className="jps-status-table">
                       <thead>
                         <tr>
                           <th>JP</th>
