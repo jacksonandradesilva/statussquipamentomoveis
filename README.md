@@ -29,6 +29,8 @@ Sem essas variaveis, o app funciona em modo local usando `localStorage`.
 
 Tabela: `equipamentos_mina`
 
+Tabela: `jps_mina`
+
 Colunas:
 - `id`
 - `nome`
@@ -39,6 +41,8 @@ Colunas:
 - `hora_fim`
 - `data_hora_cadastro`
 - `created_at`
+
+As duas tabelas seguem a mesma estrutura para manter os cadastros e a visualizacao de status em paginas separadas.
 
 ## 4. Deploy no Vercel
 
