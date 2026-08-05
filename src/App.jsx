@@ -2849,7 +2849,7 @@ export default function App() {
     const { data, error } = await supabase
       .from('acessos_sistema')
       .select(
-        'status, acesso_dashboard, acesso_registros, acesso_jps_cadastro, acesso_jps_status, acesso_status, acesso_status_previsto, acesso_relatorios, pode_editar_status, pode_excluir_status'
+        'status, acesso_dashboard, acesso_registros, acesso_jps_cadastro, acesso_jps_status, acesso_jps_status_previsto, acesso_status, acesso_status_previsto, acesso_relatorios, pode_editar_status, pode_excluir_status'
       )
       .eq('email', email)
       .maybeSingle();
