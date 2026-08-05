@@ -25,7 +25,8 @@ const DEFAULT_STATUS_ACTIONS = {
 const statusOptions = [
   { value: 'parado', label: 'Parado' },
   { value: 'liberado', label: 'Liberado' },
-  { value: 'standby', label: 'Standby' },
+  { value: 'restricao', label: 'Restrição' },
+  { value: 'preventiva', label: 'Preventiva' },
   { value: 'aguardandoMaterial', label: 'Aguardando Material' },
   { value: 'faltaMaoDeObra', label: 'Falta de Mao de Obra' },
   { value: 'EquipamentoEmReforma', label: 'Equipamento em Reforma' }
