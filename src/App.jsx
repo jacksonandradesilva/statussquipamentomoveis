@@ -3,12 +3,16 @@ import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react
 import { hasSupabaseEnv, supabase } from './lib/supabaseClient';
 
 const STORAGE_KEY = 'Status_Mina_Data';
+const JPS_STORAGE_KEY = 'Status_Mina_JPs_Data';
 const RELATORIO_STORAGE_KEY = 'Relatorio_Diario_Turnos';
 const ADMIN_EMAILS = ['jacksonandradesilva33@gmail.com', 'jacksonandradesilva33@gmail'];
 const ADMIN_CONTACT_EMAIL = 'jacksonandradesilva33@gmail.com';
 const DEFAULT_PAGE_ACCESS = {
   dashboard: true,
   registros: false,
+  jpsCadastro: false,
+  jpsStatus: false,
+  jpsStatusPrevisto: false,
   status: false,
   statusPrevisto: false,
   relatorios: false
@@ -23,6 +27,7 @@ const statusOptions = [
   { value: 'liberado', label: 'Liberado' },
   { value: 'standby', label: 'Standby' },
   { value: 'aguardandoMaterial', label: 'Aguardando Material' },
+  { value: 'faltaMaoDeObra', label: 'Falta de Mao de Obra' },
   { value: 'EquipamentoEmReforma', label: 'Equipamento em Reforma' }
 ];
 
@@ -197,6 +202,9 @@ function getAdminAccess() {
   return {
     dashboard: true,
     registros: true,
+    jpsCadastro: true,
+    jpsStatus: true,
+    jpsStatusPrevisto: true,
     status: true,
     statusPrevisto: true,
     relatorios: true
@@ -214,6 +222,9 @@ function fromAcessoRowToPageAccess(row) {
   return {
     dashboard: Boolean(row?.acesso_dashboard),
     registros: Boolean(row?.acesso_registros),
+    jpsCadastro: Boolean(row?.acesso_jps_cadastro),
+    jpsStatus: Boolean(row?.acesso_jps_status),
+    jpsStatusPrevisto: Boolean(row?.acesso_jps_status_previsto),
     status: Boolean(row?.acesso_status),
     statusPrevisto: Boolean(row?.acesso_status_previsto),
     relatorios: Boolean(row?.acesso_relatorios)
@@ -227,12 +238,8 @@ function fromAcessoRowToStatusActions(row) {
   };
 }
 
-function getLandingPath(pageAccess, isAdmin) {
+function getLandingPath(pageAccess, statusActions, isAdmin) {
   if (isAdmin) {
-    return '/dashboard';
-  }
-
-  if (pageAccess.dashboard) {
     return '/dashboard';
   }
 
@@ -240,8 +247,28 @@ function getLandingPath(pageAccess, isAdmin) {
     return '/';
   }
 
+  if (statusActions?.editar || statusActions?.excluir) {
+    return '/';
+  }
+
+  if (pageAccess.dashboard) {
+    return '/dashboard';
+  }
+
+  if (pageAccess.jpsCadastro) {
+    return '/jps-cadastro';
+  }
+
   if (pageAccess.status) {
     return '/status';
+  }
+
+  if (pageAccess.jpsStatus) {
+    return '/jps-status';
+  }
+
+  if (pageAccess.jpsStatusPrevisto) {
+    return '/jps-status-previsto';
   }
 
   if (pageAccess.statusPrevisto) {
@@ -282,14 +309,29 @@ function Navegacao({ onLogout, isAdmin, pageAccess }) {
           Painel de Registros
         </Link>
       )}
+      {(isAdmin || pageAccess.jpsCadastro) && (
+        <Link to="/jps-cadastro" className="tab-link">
+          Cadastro de JPs
+        </Link>
+      )}
       {(isAdmin || pageAccess.status) && (
         <Link to="/status" className="tab-link">
           Status dos Equipamentos
         </Link>
       )}
+      {(isAdmin || pageAccess.jpsStatus) && (
+        <Link to="/jps-status" className="tab-link">
+          Status de JPs
+        </Link>
+      )}
+      {(isAdmin || pageAccess.jpsStatusPrevisto) && (
+        <Link to="/jps-status-previsto" className="tab-link">
+          Previsao de JPs
+        </Link>
+      )}
       {(isAdmin || pageAccess.statusPrevisto) && (
         <Link to="/status-previsto" className="tab-link">
-          Status Previsto
+          Previsao Maquinas
         </Link>
       )}
       {(isAdmin || pageAccess.relatorios) && (
@@ -504,7 +546,7 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
     const { data, error } = await supabase
       .from('acessos_sistema')
       .select(
-        'id, email, status, solicitado_em, liberado_em, liberado_por, acesso_dashboard, acesso_registros, acesso_status, acesso_status_previsto, acesso_relatorios, pode_editar_status, pode_excluir_status'
+        'id, email, status, solicitado_em, liberado_em, liberado_por, acesso_dashboard, acesso_registros, acesso_jps_cadastro, acesso_jps_status, acesso_jps_status_previsto, acesso_status, acesso_status_previsto, acesso_relatorios, pode_editar_status, pode_excluir_status'
       )
       .order('solicitado_em', { ascending: false });
 
@@ -524,6 +566,9 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
       nextDraft[item.id] = {
         acesso_dashboard: Boolean(item.acesso_dashboard),
         acesso_registros: Boolean(item.acesso_registros),
+        acesso_jps_cadastro: Boolean(item.acesso_jps_cadastro),
+        acesso_jps_status: Boolean(item.acesso_jps_status),
+        acesso_jps_status_previsto: Boolean(item.acesso_jps_status_previsto),
         acesso_status: Boolean(item.acesso_status),
         acesso_status_previsto: Boolean(item.acesso_status_previsto),
         acesso_relatorios: Boolean(item.acesso_relatorios),
@@ -625,6 +670,9 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
         ...(prev[itemId] ?? {
           acesso_dashboard: false,
           acesso_registros: false,
+          acesso_jps_cadastro: false,
+          acesso_jps_status: false,
+          acesso_jps_status_previsto: false,
           acesso_status: false,
           acesso_status_previsto: false,
           acesso_relatorios: false,
@@ -649,7 +697,16 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
       return;
     }
 
-    if (!draft.acesso_dashboard && !draft.acesso_registros && !draft.acesso_status && !draft.acesso_status_previsto && !draft.acesso_relatorios) {
+    if (
+      !draft.acesso_dashboard &&
+      !draft.acesso_registros &&
+      !draft.acesso_jps_cadastro &&
+      !draft.acesso_jps_status &&
+      !draft.acesso_jps_status_previsto &&
+      !draft.acesso_status &&
+      !draft.acesso_status_previsto &&
+      !draft.acesso_relatorios
+    ) {
       setErroSolicitacoes('Selecione ao menos uma pagina para acesso.');
       return;
     }
@@ -663,6 +720,9 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
       .update({
         acesso_dashboard: draft.acesso_dashboard,
         acesso_registros: draft.acesso_registros,
+        acesso_jps_cadastro: draft.acesso_jps_cadastro,
+        acesso_jps_status: draft.acesso_jps_status,
+        acesso_jps_status_previsto: draft.acesso_jps_status_previsto,
         acesso_status: draft.acesso_status,
         acesso_status_previsto: draft.acesso_status_previsto,
         acesso_relatorios: draft.acesso_relatorios,
@@ -754,10 +814,38 @@ function AdminPage({ currentUserEmail, onRegistrarHistorico }) {
                         <label>
                           <input
                             type="checkbox"
+                            checked={Boolean(permissoesDraft[item.id]?.acesso_jps_cadastro)}
+                            onChange={(event) =>
+                              onPermissaoChange(item.id, 'acesso_jps_cadastro', event.target.checked)
+                            }
+                          />
+                          Cadastro de JPs
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
                             checked={Boolean(permissoesDraft[item.id]?.acesso_status)}
                             onChange={(event) => onPermissaoChange(item.id, 'acesso_status', event.target.checked)}
                           />
                           Status
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(permissoesDraft[item.id]?.acesso_jps_status)}
+                            onChange={(event) => onPermissaoChange(item.id, 'acesso_jps_status', event.target.checked)}
+                          />
+                          Status de JPs
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(permissoesDraft[item.id]?.acesso_jps_status_previsto)}
+                            onChange={(event) =>
+                              onPermissaoChange(item.id, 'acesso_jps_status_previsto', event.target.checked)
+                            }
+                          />
+                          Previsao de JPs
                         </label>
                         <label>
                           <input
@@ -958,9 +1046,16 @@ function AdminHistoricoPage() {
   );
 }
 
-function DashboardSection({ loading, dashboard, equipamentos }) {
+function DashboardSection({ loading, dashboard, equipamentos, jpsDashboard, jps }) {
   const previsoes = equipamentos.filter((item) => item.previsaoLiberacao || item.quantidadeDias);
   const prazosNaoConcluidos = equipamentos.filter((item) => item.status !== 'liberado' && !item.previsaoLiberacao && !item.quantidadeDias);
+  const equipamentosAguardandoMaterial = equipamentos.filter((item) => item.status === 'aguardandoMaterial');
+  const equipamentosFaltaMaoDeObra = equipamentos.filter((item) => item.status === 'faltaMaoDeObra');
+  const jpsParados = jps.filter((item) => item.status === 'parado');
+  const jpsLiberados = jps.filter((item) => item.status === 'liberado');
+  const jpsAguardandoMaterial = jps.filter((item) => item.status === 'aguardandoMaterial');
+  const jpsFaltaMaoDeObra = jps.filter((item) => item.status === 'faltaMaoDeObra');
+  const jpsSemPrevisao = jps.filter((item) => item.status === 'parado' && !item.previsaoLiberacao && !item.quantidadeDias);
 
   return (
     <section className="panel">
@@ -975,7 +1070,7 @@ function DashboardSection({ loading, dashboard, equipamentos }) {
               <p>{dashboard.total}</p>
             </article>
             <article className="dash-card total">
-              <h3>Aguardando Peca</h3>
+              <h3>Aguardando Material</h3>
               <p>{dashboard.aguardandoPeca}</p>
             </article>
             <article className="dash-card stopped">
@@ -988,6 +1083,95 @@ function DashboardSection({ loading, dashboard, equipamentos }) {
               <p>{dashboard.liberados}</p>
               <small>{dashboard.taxaLiberados}% do total</small>
             </article>
+            <article className="dash-card labor">
+              <h3>Falta de Mao de Obra</h3>
+              <p>{dashboard.faltaMaoDeObra}</p>
+            </article>
+          </div>
+
+          <div className="dash-grid">
+            <article className="dash-card total">
+              <h3>Total de JPs</h3>
+              <p>{jpsDashboard.total}</p>
+            </article>
+            <article className="dash-card stopped">
+              <h3>JPs Parados</h3>
+              <p>{jpsDashboard.parados}</p>
+              <small>{jpsDashboard.taxaParados}% do total</small>
+            </article>
+            <article className="dash-card released">
+              <h3>JPs Liberados</h3>
+              <p>{jpsDashboard.liberados}</p>
+              <small>{jpsDashboard.taxaLiberados}% do total</small>
+            </article>
+            <article className="dash-card total">
+              <h3>JPs Aguardando Material</h3>
+              <p>{jpsDashboard.aguardandoPeca}</p>
+            </article>
+            <article className="dash-card labor">
+              <h3>JPs Falta de Mao de Obra</h3>
+              <p>{jpsDashboard.faltaMaoDeObra}</p>
+            </article>
+          </div>
+
+          <div className="dash-list">
+            <h3>Equipamentos aguardando material</h3>
+            {equipamentosAguardandoMaterial.length === 0 ? (
+              <p>Nenhum equipamento aguardando material.</p>
+            ) : (
+              <ul>
+                {equipamentosAguardandoMaterial.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - Material: {item.descricao || 'Sem descricao do material informada'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
+            <h3>JPs aguardando material</h3>
+            {jpsAguardandoMaterial.length === 0 ? (
+              <p>Nenhum JP aguardando material.</p>
+            ) : (
+              <ul>
+                {jpsAguardandoMaterial.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - Material: {item.descricao || 'Sem descricao do material informada'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
+            <h3>Equipamentos falta de mao de obra</h3>
+            {equipamentosFaltaMaoDeObra.length === 0 ? (
+              <p>Nenhum equipamento em falta de mao de obra.</p>
+            ) : (
+              <ul>
+                {equipamentosFaltaMaoDeObra.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - Descricao: {item.descricao || 'Sem descricao informada'}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
+            <h3>JPs falta de mao de obra</h3>
+            {jpsFaltaMaoDeObra.length === 0 ? (
+              <p>Nenhum JP em falta de mao de obra.</p>
+            ) : (
+              <ul>
+                {jpsFaltaMaoDeObra.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - Descricao: {item.descricao || 'Sem descricao informada'}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="dash-list">
@@ -1003,6 +1187,21 @@ function DashboardSection({ loading, dashboard, equipamentos }) {
                       <strong>{item.nome}</strong> - {item.causa || 'Sem causa informada'}
                     </li>
                   ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
+            <h3>JPs parados no momento</h3>
+            {jpsParados.length === 0 ? (
+              <p>Nenhum JP parado.</p>
+            ) : (
+              <ul>
+                {jpsParados.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - {item.causa || 'Sem causa informada'}
+                  </li>
+                ))}
               </ul>
             )}
           </div>
@@ -1025,12 +1224,46 @@ function DashboardSection({ loading, dashboard, equipamentos }) {
           </div>
 
           <div className="dash-list">
+            <h3>Previsoes de liberacao dos JPs</h3>
+            {jps.filter((item) => item.previsaoLiberacao || item.quantidadeDias).length === 0 ? (
+              <p>Nenhuma previsao cadastrada.</p>
+            ) : (
+              <ul>
+                {jps
+                  .filter((item) => item.previsaoLiberacao || item.quantidadeDias)
+                  .map((item) => (
+                    <li key={item.id}>
+                      <strong>{item.nome}</strong> - Previsao:{' '}
+                      {item.previsaoLiberacao ? formatDateOnly(item.previsaoLiberacao) : '-'} {'/'} Dias:{' '}
+                      {item.quantidadeDias || '-'}
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
             <h3>Prazos não concluídos</h3>
             {prazosNaoConcluidos.length === 0 ? (
               <p>Nenhum prazo pendente.</p>
             ) : (
               <ul>
                 {prazosNaoConcluidos.map((item) => (
+                  <li key={item.id}>
+                    <strong>{item.nome}</strong> - Sem previsao de liberacao cadastrada.
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="dash-list">
+            <h3>Prazos nao concluídos dos JPs</h3>
+            {jpsSemPrevisao.length === 0 ? (
+              <p>Nenhum prazo pendente.</p>
+            ) : (
+              <ul>
+                {jpsSemPrevisao.map((item) => (
                   <li key={item.id}>
                     <strong>{item.nome}</strong> - Sem previsao de liberacao cadastrada.
                   </li>
@@ -1052,6 +1285,12 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
   const [loading, setLoading] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
+  const [jps, setJps] = useState([]);
+  const [jpsFormData, setJpsFormData] = useState(emptyForm);
+  const [editandoJpId, setEditandoJpId] = useState(null);
+  const [loadingJps, setLoadingJps] = useState(true);
+  const [mensagemJps, setMensagemJps] = useState('');
+  const [erroJps, setErroJps] = useState('');
   const [relatorios, setRelatorios] = useState([]);
   const [relatorioForm, setRelatorioForm] = useState(emptyRelatorioForm);
   const [relatorioMensagem, setRelatorioMensagem] = useState('');
@@ -1059,23 +1298,63 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
   const [filtroTurno, setFiltroTurno] = useState('TODOS');
   const [relatorioSelecionadoId, setRelatorioSelecionadoId] = useState(null);
 
-  const landingPath = getLandingPath(pageAccess, isAdmin);
+  const landingPath = getLandingPath(pageAccess, statusActions, isAdmin);
 
   const dashboard = useMemo(() => {
     const total = equipamentos.length;
     const parados = equipamentos.filter((item) => item.status === 'parado').length;
     const liberados = equipamentos.filter((item) => item.status === 'liberado').length;
     const aguardandoPeca = equipamentos.filter((item) => item.status === 'aguardandoMaterial').length;
+    const faltaMaoDeObra = equipamentos.filter((item) => item.status === 'faltaMaoDeObra').length;
 
     return {
       total,
       parados,
       liberados,
       aguardandoPeca,
+      faltaMaoDeObra,
       taxaParados: total > 0 ? Math.round((parados / total) * 100) : 0,
       taxaLiberados: total > 0 ? Math.round((liberados / total) * 100) : 0
     };
   }, [equipamentos]);
+
+  const jpsDashboard = useMemo(() => {
+    const total = jps.length;
+    const parados = jps.filter((item) => item.status === 'parado').length;
+    const liberados = jps.filter((item) => item.status === 'liberado').length;
+    const aguardandoPeca = jps.filter((item) => item.status === 'aguardandoMaterial').length;
+    const faltaMaoDeObra = jps.filter((item) => item.status === 'faltaMaoDeObra').length;
+
+    return {
+      total,
+      parados,
+      liberados,
+      aguardandoPeca,
+      faltaMaoDeObra,
+      taxaParados: total > 0 ? Math.round((parados / total) * 100) : 0,
+      taxaLiberados: total > 0 ? Math.round((liberados / total) * 100) : 0
+    };
+  }, [jps]);
+
+  const jpsPrevisoes = useMemo(() => jps.filter((item) => item.previsaoLiberacao || item.quantidadeDias), [jps]);
+
+  const jpsPrazosNaoConcluidos = useMemo(
+    () => jps.filter((item) => item.status === 'parado' && !item.previsaoLiberacao && !item.quantidadeDias),
+    [jps]
+  );
+
+  const jpsPrevisaoResumo = useMemo(() => {
+    const total = jps.length;
+    const comPrevisao = jpsPrevisoes.length;
+    const semPrevisao = jps.filter((item) => item.status === 'parado' && !item.previsaoLiberacao && !item.quantidadeDias).length;
+
+    return {
+      total,
+      comPrevisao,
+      semPrevisao,
+      taxaComPrevisao: total > 0 ? Math.round((comPrevisao / total) * 100) : 0
+    };
+  }, [jps, jpsPrevisoes.length]);
 
   const relatorioResumo = useMemo(() => {
     const total = relatorios.length;
@@ -1101,8 +1380,31 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
     [relatorios, relatorioSelecionadoId]
   );
 
+  const equipamentosPrevisoes = useMemo(
+    () => equipamentos.filter((item) => item.previsaoLiberacao || item.quantidadeDias),
+    [equipamentos]
+  );
+
+  const equipamentosPrazosNaoConcluidos = useMemo(
+    () => equipamentos.filter((item) => item.status !== 'liberado' && !item.previsaoLiberacao && !item.quantidadeDias),
+    [equipamentos]
+  );
+
+  const equipamentosPrevisaoResumo = useMemo(() => {
+    const total = equipamentos.length;
+    const comPrevisao = equipamentosPrevisoes.length;
+
+    return {
+      total,
+      comPrevisao,
+      semPrevisao: total - comPrevisao,
+      taxaComPrevisao: total > 0 ? Math.round((comPrevisao / total) * 100) : 0
+    };
+  }, [equipamentos, equipamentosPrevisoes.length]);
+
   useEffect(() => {
     void carregarDados();
+    void carregarJps();
     void carregarRelatorios();
   }, []);
 
@@ -1158,6 +1460,53 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
 
   function salvarLocal(lista) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(lista));
+  }
+
+  async function carregarJps() {
+    setLoadingJps(true);
+    setErroJps('');
+
+    if (hasSupabaseEnv) {
+      const { data, error } = await supabase.from('jps_mina').select('*').order('id', { ascending: true });
+
+      if (error) {
+        setErroJps('Falha ao carregar JPs no Supabase. Exibindo dados locais.');
+        carregarJpsLocais();
+      } else {
+        setJps((data ?? []).map(fromSupabaseRow));
+      }
+
+      setLoadingJps(false);
+      return;
+    }
+
+    carregarJpsLocais();
+    setLoadingJps(false);
+  }
+
+  async function carregarJpsPrevisao() {
+    return jps;
+  }
+
+  function carregarJpsLocais() {
+    const dadosSalvos = localStorage.getItem(JPS_STORAGE_KEY);
+
+    if (!dadosSalvos) {
+      setJps([]);
+      return;
+    }
+
+    try {
+      const dados = JSON.parse(dadosSalvos);
+      const lista = Array.isArray(dados) ? dados : dados.jps ?? [];
+      setJps(lista);
+    } catch {
+      setJps([]);
+    }
+  }
+
+  function salvarJpsLocal(lista) {
+    localStorage.setItem(JPS_STORAGE_KEY, JSON.stringify(lista));
   }
 
   async function carregarRelatorios() {
@@ -1219,6 +1568,24 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
   function limparFormulario() {
     setFormData(emptyForm);
     setEditandoId(null);
+  }
+
+  function onJpInputChange(event) {
+    const { name, value } = event.target;
+    setJpsFormData((prev) => {
+      const next = { ...prev, [name]: value };
+
+      if (name === 'horaFim') {
+        next.status = resolveEquipamentoStatus(prev.status, value);
+      }
+
+      return next;
+    });
+  }
+
+  function limparJpFormulario() {
+    setJpsFormData(emptyForm);
+    setEditandoJpId(null);
   }
 
   function onRelatorioInputChange(event) {
@@ -1309,6 +1676,138 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
     }
 
     limparFormulario();
+  }
+
+  async function onSubmitJp(event) {
+    event.preventDefault();
+    setMensagemJps('');
+    setErroJps('');
+
+    if (!jpsFormData.nome.trim() || !jpsFormData.status) {
+      return;
+    }
+
+    const now = formatDateTime(new Date());
+    const jpPayload = {
+      nome: jpsFormData.nome.trim(),
+      status: resolveEquipamentoStatus(jpsFormData.status, jpsFormData.horaFim),
+      causa: jpsFormData.causa.trim(),
+      descricao: jpsFormData.descricao.trim(),
+      horaInicio: jpsFormData.horaInicio,
+      horaFim: jpsFormData.horaFim,
+      previsaoLiberacao: jpsFormData.previsaoLiberacao,
+      quantidadeDias: calcularQuantidadeDias(now, jpsFormData.previsaoLiberacao),
+      dataHoraCadastro: now
+    };
+
+    if (hasSupabaseEnv) {
+      if (editandoJpId === null) {
+        const { error } = await supabase.from('jps_mina').insert(toSupabasePayload(jpPayload));
+
+        if (error) {
+          setErroJps(`Erro ao cadastrar JP no Supabase: ${error.message}`);
+          return;
+        }
+
+        setMensagemJps('JP cadastrado com sucesso.');
+        await onRegistrarHistorico({
+          email: currentUserEmail,
+          acao: 'cadastro_jp',
+          detalhes: `JP ${jpPayload.nome} cadastrado com status ${jpPayload.status}`
+        });
+      } else {
+        const { error } = await supabase.from('jps_mina').update(toSupabasePayload(jpPayload)).eq('id', editandoJpId);
+
+        if (error) {
+          setErroJps('Erro ao atualizar JP no Supabase.');
+          return;
+        }
+
+        setMensagemJps('JP atualizado com sucesso.');
+        await onRegistrarHistorico({
+          email: currentUserEmail,
+          acao: 'edicao_jp',
+          detalhes: `JP ID ${editandoJpId} atualizado para status ${jpPayload.status}`
+        });
+      }
+
+      limparJpFormulario();
+      await carregarJps();
+      return;
+    }
+
+    if (editandoJpId === null) {
+      const nextId = jps.length > 0 ? Math.max(...jps.map((item) => Number(item.id) || 0)) + 1 : 1;
+      const novo = { ...jpPayload, id: nextId };
+      const lista = [...jps, novo];
+      setJps(lista);
+      salvarJpsLocal(lista);
+      setMensagemJps('JP cadastrado localmente.');
+    } else {
+      const lista = jps.map((item) =>
+        item.id === editandoJpId ? { ...item, ...jpPayload, id: editandoJpId } : item
+      );
+      setJps(lista);
+      salvarJpsLocal(lista);
+      setMensagemJps('JP atualizado localmente.');
+    }
+
+    limparJpFormulario();
+  }
+
+  function editarJp(item) {
+    if (!isAdmin && !statusActions.editar) {
+      setErroJps('Seu usuario nao possui permissao para editar na pagina de status de JPs.');
+      return;
+    }
+
+    setJpsFormData({
+      nome: item.nome ?? '',
+      status: item.status ?? '',
+      causa: item.causa ?? '',
+      descricao: item.descricao ?? '',
+      horaInicio: item.horaInicio ?? '',
+      horaFim: item.horaFim ?? '',
+      previsaoLiberacao: item.previsaoLiberacao ?? '',
+      quantidadeDias: item.quantidadeDias ?? ''
+    });
+    setEditandoJpId(item.id);
+    setMensagemJps('');
+    setErroJps('');
+    navigate('/jps-cadastro');
+  }
+
+  async function excluirJp(itemId) {
+    setMensagemJps('');
+    setErroJps('');
+
+    if (!isAdmin && !statusActions.excluir) {
+      setErroJps('Seu usuario nao possui permissao para excluir na pagina de status de JPs.');
+      return;
+    }
+
+    if (hasSupabaseEnv) {
+      const { error } = await supabase.from('jps_mina').delete().eq('id', itemId);
+
+      if (error) {
+        setErroJps('Erro ao excluir JP no Supabase.');
+        return;
+      }
+
+      setMensagemJps('JP excluido com sucesso.');
+      await onRegistrarHistorico({
+        email: currentUserEmail,
+        acao: 'exclusao_jp',
+        detalhes: `JP ID ${itemId} excluido`
+      });
+      await carregarJps();
+      return;
+    }
+
+    const lista = jps.filter((item) => item.id !== itemId);
+    setJps(lista);
+    salvarJpsLocal(lista);
+    setMensagemJps('JP excluido localmente.');
   }
 
   function editarEquipamento(item) {
@@ -1467,7 +1966,13 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
           path="/dashboard"
           element={
             isAdmin || pageAccess.dashboard ? (
-              <DashboardSection loading={loading} dashboard={dashboard} equipamentos={equipamentos} />
+              <DashboardSection
+                loading={loading || loadingJps}
+                dashboard={dashboard}
+                equipamentos={equipamentos}
+                jpsDashboard={jpsDashboard}
+                jps={jps}
+              />
             ) : (
               <Navigate to={landingPath} replace />
             )
@@ -1476,7 +1981,7 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
         <Route
           path="/"
           element={
-            isAdmin || pageAccess.registros ? (
+            isAdmin || pageAccess.registros || statusActions.editar || statusActions.excluir ? (
               <section className="panel">
                 <h2>Painel de Registros</h2>
 
@@ -1568,6 +2073,100 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
           }
         />
         <Route
+          path="/jps-cadastro"
+          element={
+            isAdmin || pageAccess.jpsCadastro || statusActions.editar || statusActions.excluir ? (
+              <section className="panel">
+                <h2>Cadastro de JPs</h2>
+
+                <form className="form-grid" onSubmit={onSubmitJp}>
+                  <label htmlFor="jpNome">Tag do JP</label>
+                  <input
+                    id="jpNome"
+                    name="nome"
+                    type="text"
+                    placeholder="Digite o Tag do JP"
+                    required
+                    value={jpsFormData.nome}
+                    onChange={onJpInputChange}
+                  />
+
+                  <label htmlFor="jpStatus">Status</label>
+                  <select id="jpStatus" name="status" required value={jpsFormData.status} onChange={onJpInputChange}>
+                    <option value="" disabled>
+                      Selecione o status
+                    </option>
+                    {statusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label htmlFor="jpCausa">Equipamento / Causa</label>
+                  <input
+                    id="jpCausa"
+                    name="causa"
+                    type="text"
+                    placeholder="Equipamento e a causa (se aplicavel)"
+                    value={jpsFormData.causa}
+                    onChange={onJpInputChange}
+                  />
+
+                  <label htmlFor="jpDescricao">Descricao</label>
+                  <input
+                    id="jpDescricao"
+                    name="descricao"
+                    type="text"
+                    placeholder="Descricao adicional do JP"
+                    value={jpsFormData.descricao}
+                    onChange={onJpInputChange}
+                  />
+
+                  <label htmlFor="jpHoraInicio">Horario Inicio</label>
+                  <input
+                    id="jpHoraInicio"
+                    name="horaInicio"
+                    type="time"
+                    value={jpsFormData.horaInicio}
+                    onChange={onJpInputChange}
+                  />
+
+                  <label htmlFor="jpHoraFim">Horario Fim</label>
+                  <input
+                    id="jpHoraFim"
+                    name="horaFim"
+                    type="time"
+                    value={jpsFormData.horaFim}
+                    onChange={onJpInputChange}
+                  />
+
+                  <label htmlFor="jpPrevisaoLiberacao">Previsao de Liberacao</label>
+                  <input
+                    id="jpPrevisaoLiberacao"
+                    name="previsaoLiberacao"
+                    type="date"
+                    value={jpsFormData.previsaoLiberacao}
+                    onChange={onJpInputChange}
+                  />
+
+                  <div className="actions">
+                    <button type="submit">{editandoJpId === null ? 'Cadastrar' : 'Atualizar'}</button>
+                    <button type="button" className="ghost" onClick={limparJpFormulario}>
+                      Limpar
+                    </button>
+                  </div>
+                </form>
+
+                {mensagemJps && <p className="feedback success">{mensagemJps}</p>}
+                {erroJps && <p className="feedback error">{erroJps}</p>}
+              </section>
+            ) : (
+              <Navigate to={landingPath} replace />
+            )
+          }
+        />
+        <Route
           path="/status"
           element={
             isAdmin || pageAccess.status ? (
@@ -1636,12 +2235,208 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
           }
         />
         <Route
+          path="/jps-status"
+          element={
+            isAdmin || pageAccess.jpsStatus ? (
+              <section className="panel">
+                <h2>Status de JPs</h2>
+                {loadingJps ? (
+                  <p>Carregando...</p>
+                ) : (
+                  <div className="table-wrap">
+                    <table className="jps-status-table">
+                      <thead>
+                        <tr>
+                          <th>JP</th>
+                          <th>Status</th>
+                          <th>Causa da Parada</th>
+                          <th>Descricao</th>
+                          <th>Horario Inicio</th>
+                          <th>Horario Fim</th>
+                          <th>Data e Hora Cadastro</th>
+                          <th>Acoes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {jps.length === 0 ? (
+                          <tr>
+                            <td colSpan="8">Nenhum registro encontrado.</td>
+                          </tr>
+                        ) : (
+                          jps.map((item) => (
+                            <tr key={item.id}>
+                              <td>{item.nome}</td>
+                              <td>
+                                <span className={`status-chip status-${item.status}`}>
+                                  {statusOptions.find((option) => option.value === item.status)?.label ?? item.status}
+                                </span>
+                              </td>
+                              <td>{item.causa || '-'}</td>
+                              <td>{item.descricao || '-'}</td>
+                              <td>{item.horaInicio || '-'}</td>
+                              <td>{item.horaFim || '-'}</td>
+                              <td>{item.dataHoraCadastro || '-'}</td>
+                              <td className="actions-cell">
+                                {(isAdmin || statusActions.editar) && (
+                                  <button className="small" onClick={() => editarJp(item)}>
+                                    Editar
+                                  </button>
+                                )}
+                                {(isAdmin || statusActions.excluir) && (
+                                  <button className="small danger" onClick={() => excluirJp(item.id)}>
+                                    Excluir
+                                  </button>
+                                )}
+                                {!isAdmin && !statusActions.editar && !statusActions.excluir && '-'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+            ) : (
+              <Navigate to={landingPath} replace />
+            )
+          }
+        />
+        <Route
+          path="/jps-status-previsto"
+          element={
+            isAdmin || pageAccess.jpsStatusPrevisto ? (
+              <section className="panel">
+                <h2>Status de JPs - Previsao de Liberacao</h2>
+                <p>
+                  Consulte a previsao de liberacao e a quantidade de dias calculada automaticamente a partir da data de
+                  cadastro e da previsao informada para os JPs.
+                </p>
+                <div className="dash-grid">
+                  <article className="dash-card total">
+                    <h3>Total de JPs</h3>
+                    <p>{jpsPrevisaoResumo.total}</p>
+                  </article>
+                  <article className="dash-card released">
+                    <h3>JPs com previsao</h3>
+                    <p>{jpsPrevisaoResumo.comPrevisao}</p>
+                    <small>{jpsPrevisaoResumo.taxaComPrevisao}% do total</small>
+                  </article>
+                  <article className="dash-card stopped">
+                    <h3>JPs sem previsao</h3>
+                    <p>{jpsPrevisaoResumo.semPrevisao}</p>
+                  </article>
+                  <article className="dash-card total">
+                    <h3>JPs liberados</h3>
+                    <p>{jps.filter((item) => item.status === 'liberado').length}</p>
+                  </article>
+                </div>
+
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>JP</th>
+                        <th>Status</th>
+                        <th>Previsao de Liberacao</th>
+                        <th>Quantidade de Dias</th>
+                        <th>Causa da Parada</th>
+                        <th>Descricao</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {jps.length === 0 ? (
+                        <tr>
+                          <td colSpan="6">Nenhum registro encontrado.</td>
+                        </tr>
+                      ) : (
+                        jps.map((item) => (
+                          <tr key={item.id}>
+                            <td>{item.nome}</td>
+                            <td>
+                              <span className={`status-chip status-${item.status}`}>
+                                {statusOptions.find((option) => option.value === item.status)?.label ?? item.status}
+                              </span>
+                            </td>
+                            <td>{item.previsaoLiberacao ? formatDateOnly(item.previsaoLiberacao) : '-'}</td>
+                            <td>{item.quantidadeDias ? item.quantidadeDias : '-'}</td>
+                            <td>{item.causa || '-'}</td>
+                            <td>{item.descricao || '-'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="dash-list">
+                  <h3>JPs com previsao cadastrada</h3>
+                  {jpsPrevisoes.length === 0 ? (
+                    <p>Nenhuma previsao cadastrada.</p>
+                  ) : (
+                    <ul>
+                      {jpsPrevisoes.map((item) => (
+                        <li key={item.id}>
+                          <strong>{item.nome}</strong> - Previsao:{' '}
+                          {item.previsaoLiberacao ? formatDateOnly(item.previsaoLiberacao) : '-'} / Dias:{' '}
+                          {item.quantidadeDias || '-'}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="dash-list">
+                  <h3>Prazos nao concluídos dos JPs</h3>
+                  {jpsPrazosNaoConcluidos.length === 0 ? (
+                    <p>Nenhum prazo pendente.</p>
+                  ) : (
+                    <ul>
+                      {jpsPrazosNaoConcluidos.map((item) => (
+                        <li key={item.id}>
+                          <strong>{item.nome}</strong> - Sem previsao de liberacao cadastrada.
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </section>
+            ) : (
+              <Navigate to={landingPath} replace />
+            )
+          }
+        />
+        <Route
           path="/status-previsto"
           element={
             isAdmin || pageAccess.statusPrevisto ? (
               <section className="panel">
                 <h2>Status Equipamentos Moveis - Previsao de Liberacao</h2>
-                <p>Consulte a previsao de liberacao e a quantidade de dias calculada automaticamente a partir da data de cadastro e da previsao informada.</p>
+                <p>
+                  Consulte a previsao de liberacao e a quantidade de dias calculada automaticamente a partir da data de
+                  cadastro e da previsao informada.
+                </p>
+
+                <div className="dash-grid">
+                  <article className="dash-card total">
+                    <h3>Total de Equipamentos</h3>
+                    <p>{equipamentosPrevisaoResumo.total}</p>
+                  </article>
+                  <article className="dash-card released">
+                    <h3>Com previsao</h3>
+                    <p>{equipamentosPrevisaoResumo.comPrevisao}</p>
+                    <small>{equipamentosPrevisaoResumo.taxaComPrevisao}% do total</small>
+                  </article>
+                  <article className="dash-card stopped">
+                    <h3>Sem previsao</h3>
+                    <p>{equipamentosPrevisaoResumo.semPrevisao}</p>
+                  </article>
+                  <article className="dash-card total">
+                    <h3>Liberados</h3>
+                    <p>{equipamentos.filter((item) => item.status === 'liberado').length}</p>
+                  </article>
+                </div>
+
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -1677,6 +2472,38 @@ function AppContent({ onLogout, isAdmin, currentUserEmail, pageAccess, statusAct
                       )}
                     </tbody>
                   </table>
+                </div>
+
+                <div className="dash-list">
+                  <h3>Equipamentos com previsao cadastrada</h3>
+                  {equipamentosPrevisoes.length === 0 ? (
+                    <p>Nenhuma previsao cadastrada.</p>
+                  ) : (
+                    <ul>
+                      {equipamentosPrevisoes.map((item) => (
+                        <li key={item.id}>
+                          <strong>{item.nome}</strong> - Previsao:{' '}
+                          {item.previsaoLiberacao ? formatDateOnly(item.previsaoLiberacao) : '-'} / Dias:{' '}
+                          {item.quantidadeDias || '-'}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="dash-list">
+                  <h3>Prazos nao concluídos dos equipamentos</h3>
+                  {equipamentosPrazosNaoConcluidos.length === 0 ? (
+                    <p>Nenhum prazo pendente.</p>
+                  ) : (
+                    <ul>
+                      {equipamentosPrazosNaoConcluidos.map((item) => (
+                        <li key={item.id}>
+                          <strong>{item.nome}</strong> - Sem previsao de liberacao cadastrada.
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </section>
             ) : (
@@ -2021,7 +2848,9 @@ export default function App() {
 
     const { data, error } = await supabase
       .from('acessos_sistema')
-      .select('status, acesso_dashboard, acesso_registros, acesso_status, acesso_status_previsto, acesso_relatorios, pode_editar_status, pode_excluir_status')
+      .select(
+        'status, acesso_dashboard, acesso_registros, acesso_jps_cadastro, acesso_jps_status, acesso_status, acesso_status_previsto, acesso_relatorios, pode_editar_status, pode_excluir_status'
+      )
       .eq('email', email)
       .maybeSingle();
 
@@ -2056,7 +2885,16 @@ export default function App() {
     const acessos = fromAcessoRowToPageAccess(data);
     const acoesStatus = fromAcessoRowToStatusActions(data);
 
-    if (!acessos.dashboard && !acessos.registros && !acessos.status && !acessos.statusPrevisto && !acessos.relatorios) {
+    if (
+      !acessos.dashboard &&
+      !acessos.registros &&
+      !acessos.jpsCadastro &&
+      !acessos.jpsStatus &&
+      !acessos.jpsStatusPrevisto &&
+      !acessos.status &&
+      !acessos.statusPrevisto &&
+      !acessos.relatorios
+    ) {
       return {
         ok: false,
         message: 'Acesso aprovado, mas sem paginas liberadas. Fale com o administrador.',
@@ -2271,6 +3109,9 @@ export default function App() {
       status: isAdminEmail(email) ? 'aprovado' : 'pendente',
       acesso_dashboard: true,
       acesso_registros: false,
+      acesso_jps_cadastro: false,
+      acesso_jps_status: false,
+      acesso_jps_status_previsto: false,
       acesso_status: false,
       acesso_status_previsto: false,
       acesso_relatorios: false,
@@ -2321,13 +3162,13 @@ export default function App() {
         <Route
           path="/login"
           element={
-            isAuthenticated ? <Navigate to={getLandingPath(pageAccess, isAdmin)} replace /> : <LoginPage onLogin={fazerLogin} notice={authNotice} />
+            isAuthenticated ? <Navigate to={getLandingPath(pageAccess, statusActions, isAdmin)} replace /> : <LoginPage onLogin={fazerLogin} notice={authNotice} />
           }
         />
         <Route
           path="/cadastro"
           element={
-            isAuthenticated ? <Navigate to={getLandingPath(pageAccess, isAdmin)} replace /> : <CadastroPage onRegister={fazerCadastro} />
+            isAuthenticated ? <Navigate to={getLandingPath(pageAccess, statusActions, isAdmin)} replace /> : <CadastroPage onRegister={fazerCadastro} />
           }
         />
         <Route

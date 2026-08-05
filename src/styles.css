@@ -270,6 +270,10 @@ body {
   color: #2f8f46;
 }
 
+.dash-card.labor p {
+  color: #8f3fb5;
+}
+
 .dash-list {
   background: #ffffff;
   border: 1px solid #b2cbef;
@@ -397,6 +401,11 @@ table {
   background: #f8fbff;
 }
 
+.jps-status-table th:first-child,
+.jps-status-table td:first-child {
+  min-width: 100px;
+}
+
 th,
 td {
   text-align: left;
@@ -444,6 +453,10 @@ tbody tr:hover {
 
 .status-aguardandoMaterial {
   background: #f39c12;
+}
+
+.status-faltaMaoDeObra {
+  background: #8f3fb5;
 }
 
 .status-EquipamentoEmReforma {
