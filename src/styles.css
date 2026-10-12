@@ -445,10 +445,31 @@ tbody tr:hover {
 
 .status-liberado {
   background: #5cb85c;
+  animation: liberadoBlink 1s linear infinite;
 }
 
-.status-standby {
-  background: #f0ad4e;
+.status-restricao {
+  color: #ffffff;
+  background: repeating-linear-gradient(
+    135deg,
+    #ffd200 0 8px,
+    #111111 8px 16px
+  );
+  border: 1px solid #111111;
+  font-weight: 800;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.85);
+}
+
+.status-preventiva {
+  color: #111111;
+  background: repeating-linear-gradient(
+    135deg,
+    #ffffff 0 8px,
+    #2d6cdf 8px 16px
+  );
+  border: 1px solid #1f4fa8;
+  font-weight: 800;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
 .status-aguardandoMaterial {
@@ -716,5 +737,18 @@ tbody tr:hover {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes liberadoBlink {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 rgba(46, 143, 70, 0);
+  }
+
+  50% {
+    opacity: 0.35;
+    box-shadow: 0 0 12px rgba(46, 143, 70, 0.75);
   }
 }
